@@ -19,6 +19,7 @@ add_library(
   Marlin/Marlin/src/libs/stopwatch.cpp
   Marlin/Marlin/src/Marlin.cpp
   Marlin/Marlin/src/module/configuration_store.cpp
+  Marlin/Marlin/src/module/delayed_commands.cpp
   Marlin/Marlin/src/module/stepper/indirection.cpp
   Marlin/Marlin/src/module/stepper/trinamic.cpp
   Marlin/Marlin/src/module/temperature.cpp
@@ -87,7 +88,7 @@ if(BOARD_IS_MASTER_BOARD)
             Marlin/Marlin/src/gcode/control/M999.cpp
             Marlin/Marlin/src/gcode/eeprom/M500-M504.cpp
             Marlin/Marlin/src/gcode/feature/advance/M900.cpp
-            Marlin/Marlin/src/gcode/feature/i2c/M260_M261.cpp
+            Marlin/Marlin/src/gcode/feature/i2c/M260_M261_M262.cpp
             Marlin/Marlin/src/gcode/feature/input_shaper/M593.cpp
             Marlin/Marlin/src/gcode/feature/input_shaper/M74.cpp
             Marlin/Marlin/src/gcode/feature/modular_bed/M556.cpp

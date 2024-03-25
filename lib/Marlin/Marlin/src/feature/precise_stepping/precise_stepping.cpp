@@ -121,7 +121,7 @@ STEPPING_INLINE MoveFlag_t get_active_axis_flags_from_block(const block_t &block
 }
 
 STEPPING_INLINE bool append_move_segment_to_queue(const double move_time, const double start_v, const double half_accel, const double print_time,
-    const xyze_double_t axes_r, const xyze_double_t start_pos, const MoveFlag_t flags) {
+    const xyze_double_t axes_r, const xyze_double_t start_pos, const MoveFlag_t flags, uint8_t pre_block_commands_idx) {
     assert(PreciseStepping::total_print_time > 0 && PreciseStepping::total_print_time < MAX_PRINT_TIME);
     uint8_t next_move_segment_queue_head;
     if (move_t *m = PreciseStepping::get_next_free_move_segment(next_move_segment_queue_head); m != nullptr) {
@@ -133,6 +133,7 @@ STEPPING_INLINE bool append_move_segment_to_queue(const double move_time, const 
         m->start_pos = start_pos;
         m->flags = flags;
         m->reference_cnt = 0;
+        m->pre_block_commands_idx = pre_block_commands_idx;
         PreciseStepping::move_segment_queue.head = next_move_segment_queue_head;
         return true;
     }
@@ -248,7 +249,7 @@ bool append_move_segments_to_queue(const block_t &block) {
             | (uint16_t(block.direction_bits & 0x0F) << MOVE_FLAG_DIR_SHIFT)
             | active_axis
             | (uint32_t(old_ps_flags) << MOVE_FLAG_RESET_POSITION_SHIFT);
-        if (!append_move_segment_to_queue(accel_t, start_v, half_accel, print_time, axes_r, start_pos, flags)) {
+        if (!append_move_segment_to_queue(accel_t, start_v, half_accel, print_time, axes_r, start_pos, flags, block.pre_block_commands_idx)) {
             bsod("Acceleration move segment wasn't append into the queue.");
         }
 
@@ -264,7 +265,7 @@ bool append_move_segments_to_queue(const block_t &block) {
             | (uint16_t(block.direction_bits & 0x0F) << MOVE_FLAG_DIR_SHIFT)
             | active_axis
             | ((accel_dist != 0.) ? 0x00 : (uint32_t(old_ps_flags) << MOVE_FLAG_RESET_POSITION_SHIFT));
-        if (!append_move_segment_to_queue(cruise_t, cruise_v, 0., print_time, axes_r, start_pos, flags)) {
+        if (!append_move_segment_to_queue(cruise_t, cruise_v, 0., print_time, axes_r, start_pos, flags, block.pre_block_commands_idx)) {
             bsod("Cruise move segment wasn't append into the queue.");
         }
 
@@ -280,7 +281,7 @@ bool append_move_segments_to_queue(const block_t &block) {
             | (uint16_t(block.direction_bits & 0x0F) << MOVE_FLAG_DIR_SHIFT)
             | active_axis
             | ((accel_dist != 0. || cruise_dist != 0.) ? 0x00 : (uint32_t(old_ps_flags) << MOVE_FLAG_RESET_POSITION_SHIFT));
-        if (!append_move_segment_to_queue(decel_t, cruise_v, -half_accel, print_time, axes_r, start_pos, flags)) {
+        if (!append_move_segment_to_queue(decel_t, cruise_v, -half_accel, print_time, axes_r, start_pos, flags, block.pre_block_commands_idx)) {
             bsod("Deceleration move segment wasn't append into the queue.");
         }
 
@@ -373,7 +374,7 @@ void classic_step_generator_reset_position(classic_step_generator_t &step_genera
 
 step_event_info_t classic_step_generator_next_step_event(classic_step_generator_t &step_generator, step_generator_state_t &step_generator_state) {
     assert(step_generator.current_move != nullptr);
-    step_event_info_t next_step_event = { std::numeric_limits<double>::max(), 0, STEP_EVENT_INFO_STATUS_GENERATED_INVALID };
+    step_event_info_t next_step_event = { std::numeric_limits<double>::max(), 0, STEP_EVENT_INFO_STATUS_GENERATED_INVALID, 0 };
 
     const float half_step_dist = Planner::mm_per_half_step[step_generator.axis];
     const float next_target = float(step_generator_state.current_distance[step_generator.axis] + (step_generator.step_dir ? 0 : -1)) * Planner::mm_per_step[step_generator.axis] + half_step_dist;
@@ -423,6 +424,7 @@ step_event_info_t classic_step_generator_next_step_event(classic_step_generator_
         step_generator_state.current_distance[step_generator.axis] += (step_generator.step_dir ? 1 : -1);
     }
 
+    next_step_event.pre_block_commands_idx = step_generator.current_move->pre_block_commands_idx;
     // When std::numeric_limits<double>::max() is returned, it means that for the current state of the move segment queue, there isn't any next step event for this axis.
     return next_step_event;
 }
@@ -490,6 +492,8 @@ STEPPING_INLINE step_event_info_t step_generator_next_step_event(step_generator_
 static bool generate_next_step_event(step_event_i32_t &step_event, step_generator_state_t &step_state) {
     const step_index_t old_nearest_step_event_idx = step_state.step_event_index[0];
 
+    step_event_info_t *event = &step_state.step_events[old_nearest_step_event_idx];
+    step_event.pre_block_commands_idx = event->pre_block_commands_idx;
     auto step_status = step_state.step_events[old_nearest_step_event_idx].status;
     if (step_status == STEP_EVENT_INFO_STATUS_GENERATED_VALID || step_status == STEP_EVENT_INFO_STATUS_GENERATED_KEEP_ALIVE) {
         const double step_time_absolute = step_state.step_events[old_nearest_step_event_idx].time;
@@ -712,6 +716,8 @@ uint16_t PreciseStepping::process_one_step_event_from_queue() {
         const StepEventFlag_t step_dir = (step_flags & STEP_EVENT_FLAG_DIR_MASK);
         const StepEventFlag_t step_dir_inv = (step_dir ^ PreciseStepping::inverted_dirs);
         const StepEventFlag_t axis_move = (step_flags & STEP_EVENT_FLAG_AXIS_ACTIVE_MASK);
+
+        delayedCommandManager.set_ready_to_run_idx(step_event->pre_block_commands_idx);
 
         if (step_flags & STEP_EVENT_FLAG_BEGINNING_OF_MOVE_SEGMENT) {
             // a new move is about to start (or a discarding event has been requested): discard the previous one
@@ -1002,6 +1008,10 @@ STEPPING_INLINE bool append_move_discarding_step_event(step_generator_state_t &s
     if (step_event_u16_t *step_event = PreciseStepping::get_next_free_step_event(next_step_event_queue_head); step_event != nullptr) {
         step_event->time_ticks = 0;
         step_event->flags = step_state.current_flags | STEP_EVENT_FLAG_BEGINNING_OF_MOVE_SEGMENT | extra_step_flags;
+        const move_t *move = PreciseStepping::get_current_unprocessed_move_segment();
+        if (move != nullptr) {
+            step_event->pre_block_commands_idx = move->pre_block_commands_idx;
+        }
 
         PreciseStepping::step_event_queue.head = next_step_event_queue_head;
         step_state.previous_step_time = 0.;
@@ -1170,6 +1180,8 @@ void PreciseStepping::loop() {
         return;
     }
 
+    delayedCommandManager.process_ready_queue();
+
 #ifdef ISR_DEADLINE_DEBUGGING
     uint8_t step_dl_miss_buf = step_dl_miss;
     if (step_dl_miss_buf) {
@@ -1284,6 +1296,8 @@ STEPPING_INLINE void append_split_step_event(const split_step_event_t &split_ste
     assert(next_step_event != nullptr);
     assert(split_step_event.empty_step_event_cnt + 1 <= PreciseStepping::step_event_queue_free_slots());
 
+    uint8_t pre_block_commands_idx = next_step_event->pre_block_commands_idx;
+
     for (int32_t empty_step_event_idx = 0; empty_step_event_idx < split_step_event.empty_step_event_cnt; ++empty_step_event_idx) {
         if ((split_step_event.last_step_event_flags & STEP_EVENT_FLAG_FIRST_STEP_EVENT) && empty_step_event_idx == 0) {
             trigger_first_step_event_after_specified_ticks(STEP_TIMER_MAX_TICKS_LIMIT);
@@ -1296,6 +1310,7 @@ STEPPING_INLINE void append_split_step_event(const split_step_event_t &split_ste
         // advance in the queue: the required space should be already checked-for before calling append!
         next_step_event = PreciseStepping::get_next_free_step_event(next_step_event_queue_head);
         assert(next_step_event);
+        next_step_event->pre_block_commands_idx = pre_block_commands_idx;
     }
 
     if ((split_step_event.last_step_event_flags & STEP_EVENT_FLAG_FIRST_STEP_EVENT) && split_step_event.empty_step_event_cnt == 0) {
@@ -1391,6 +1406,8 @@ StepGeneratorStatus PreciseStepping::process_one_move_segment_from_queue() {
             step_event_i32_t new_step_event;
             move_done = generate_next_step_event(new_step_event, step_generator_state);
 
+            next_step_event->pre_block_commands_idx = new_step_event.pre_block_commands_idx;
+
             // accumulate into or flush the buffered step
             if (new_step_event.flags) {
                 // a new step event was produced
@@ -1445,6 +1462,7 @@ StepGeneratorStatus PreciseStepping::process_one_move_segment_from_queue() {
                 if (next_step_event == nullptr) {
                     return STEP_GENERATOR_STATUS_FULL_STEP_EVENT_QUEUE;
                 }
+                next_step_event->pre_block_commands_idx = unprocessed_move->pre_block_commands_idx;
 
                 split_step_event_t split_step_event = split_buffered_step(step_generator_state);
                 if (split_step_event.empty_step_event_cnt && split_step_event.empty_step_event_cnt + 1 > step_event_queue_free_slots()) {

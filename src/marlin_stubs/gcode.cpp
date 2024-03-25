@@ -113,12 +113,6 @@ bool GcodeSuite::process_parsed_command_custom(bool no_ok) {
 #endif
 
 #if HAS_I2C_EXPANDER()
-        case 262:
-            PrusaGcodeSuite::M262();
-            break;
-        case 263:
-            PrusaGcodeSuite::M263();
-            break;
         case 264:
             PrusaGcodeSuite::M264();
             break;

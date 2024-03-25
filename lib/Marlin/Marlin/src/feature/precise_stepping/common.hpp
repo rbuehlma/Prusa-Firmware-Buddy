@@ -83,6 +83,7 @@ typedef struct move_t {
     MoveFlag_t flags;
     // Number of step event generators that are using/referencing this move segment.
     mutable uint8_t reference_cnt = 0;
+    uint8_t pre_block_commands_idx = 0;
 } move_t;
 
 constexpr const uint16_t STEP_EVENT_FLAG_AXIS_MASK = 0x000Fu;
@@ -138,6 +139,7 @@ struct step_event_i32_t {
     int32_t time_ticks;
     StepEventFlag_t flags;
     uint32_t time_absolute_us;
+    uint8_t pre_block_commands_idx = 0;
 };
 
 // Used by step event queue. So, the maximum time difference between step events is 2^16 / STEPPER_TIMER_RATE,
@@ -147,6 +149,7 @@ struct step_event_i32_t {
 struct step_event_u16_t {
     uint16_t time_ticks;
     StepEventFlag_t flags;
+    uint8_t pre_block_commands_idx = 0;
 };
 
 #if HAS_PLANNER()
@@ -213,6 +216,7 @@ typedef struct step_event_info_t {
     double time;
     StepEventFlag_t flags;
     StepEventInfoStatus status;
+    uint8_t pre_block_commands_idx = 0;
 } step_event_info_t;
 
 enum StepGeneratorStatus : uint8_t {

@@ -622,6 +622,8 @@ private:
   #if HAS_I2C_EXPANDER()
     static void M260();
     static void M261();
+    static void M262();
+    static void M263();
   #endif
 
   #if HAS_SERVOS
