@@ -130,6 +130,8 @@ void TWIBus::send() {
     check_hal_response(ret);
   }
 
+  check_hal_response(ret);
+
   reset();
 }
 

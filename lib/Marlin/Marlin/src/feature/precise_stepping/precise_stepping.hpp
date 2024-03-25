@@ -203,7 +203,9 @@ public:
 
         // Return the first available move segment.
         next_move_segment_queue_head = move_segment_queue_next_index(move_segment_queue.head);
-        return &move_segment_queue.data[move_segment_queue.head];
+        move_t *ret = &move_segment_queue.data[move_segment_queue.head];
+        ret->pre_block_commands_idx = 0;
+        return ret;
     }
 
     // Discard the current move segment.
@@ -259,7 +261,9 @@ public:
 
         // Return the first available step event.
         next_step_event_queue_head = step_event_queue_next_index(step_event_queue.head);
-        return &step_event_queue.data[step_event_queue.head];
+        step_event_u16_t *ret = &step_event_queue.data[step_event_queue.head];
+        ret->pre_block_commands_idx = 0;
+        return ret;
     }
 
     // Discard the current step event.

@@ -36,6 +36,7 @@
 #include "../gcode/queue.h"
 #include "../feature/precise_stepping/precise_stepping.hpp"
 #include "../feature/phase_stepping/phase_stepping.hpp"
+#include "delayed_commands.h"
 
 // Value by which steps are multiplied to increase the precision of the Planner.
 constexpr const int PLANNER_STEPS_MULTIPLIER = 4;
@@ -128,6 +129,9 @@ typedef struct PlannerBlock {
   #if FAN_COUNT > 0
     uint8_t fan_speed[FAN_COUNT];
   #endif
+
+  uint8_t pre_block_commands_idx = 0;
+  xyze_pos_t targetPos;
 
   // Fields used by the motion planner to manage acceleration
   float nominal_speed,                      // The nominal speed for this block in (mm/sec)
@@ -630,7 +634,9 @@ class Planner {
 
       // Return the first available block
       next_buffer_head = next_block_index(block_buffer_head);
-      return &block_buffer[block_buffer_head];
+      block_t *ret = &block_buffer[block_buffer_head];
+      ret->pre_block_commands_idx = 0;
+      return ret;
     }
 
     /**

@@ -27,6 +27,9 @@
 #include "../../gcode.h"
 
 #include "../../../feature/twibus.h"
+#include "../../../module/delayed_commands.h"
+#include "../../module/planner.h"
+
 
 /** \addtogroup G-Codes
  * @{
@@ -63,6 +66,50 @@ void GcodeSuite::M260() {
 
   // Reset and rewind the buffer
   else if (parser.seen('R')) twibus.reset();
+}
+
+/*void GcodeSuite::M262() {
+  // Set the target address
+  if (parser.seenval('A')) twibus.address(parser.value_byte());
+
+  // Add a new byte to the buffer
+  if (parser.seenval('B')) twibus.addbyte(parser.value_byte());
+
+  // Flush the buffer to the bus
+  if (parser.seen('S')) {
+    planner.synchronize();
+    twibus.send();
+  }
+
+  // Reset and rewind the buffer
+  else if (parser.seen('R')) twibus.reset();
+}*/
+
+
+void GcodeSuite::M262() {
+  // Set the target address
+  if (parser.seenval('A')) {
+    byte addr = parser.value_byte();
+    delayedCommandManager.delay_command([addr]() { twibus.address(addr); });
+  }
+
+  // Add a new byte to the buffer
+  if (parser.seenval('B')) {
+    byte value = parser.value_byte();
+    delayedCommandManager.delay_command([value]() { twibus.addbyte(value); });
+  }
+
+  if (parser.seen('S')) {
+    // Flush the buffer to the bus
+    delayedCommandManager.delay_command([]() { twibus.send(); });
+  } else if (parser.seen('R')) {
+    // Reset and rewind the buffer
+    delayedCommandManager.delay_command([]() { twibus.reset(); });
+  }
+}
+
+void GcodeSuite::M263() {
+  delayedCommandManager.reset();
 }
 
 /**

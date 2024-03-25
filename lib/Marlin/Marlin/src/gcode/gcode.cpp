@@ -696,6 +696,8 @@ void GcodeSuite::process_parsed_command(const bool no_ok/*=false*/) {
       #if ENABLED(EXPERIMENTAL_I2CBUS)
         case 260: M260(); break;                                  // M260: Send data to an i2c slave
         case 261: M261(); break;                                  // M261: Request data from an i2c slave
+        case 262: M262(); break;                                  // M262: Send data to an i2c slave when the next move is processed
+        case 263: M263(); break;                                  // M263: Reset delayed command queue
       #endif
 
       #if ENABLED(PREVENT_COLD_EXTRUSION)

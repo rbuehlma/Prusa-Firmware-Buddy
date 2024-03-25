@@ -1447,6 +1447,11 @@ bool Planner::_populate_block(block_t * const block,
     FANS_LOOP(i) block->fan_speed[i] = thermalManager.fan_speed[i];
   #endif
 
+  if (block->is_move()) {
+    block->pre_block_commands_idx = delayedCommandManager.get_idx_for_next_block();
+    block->targetPos = target_float;
+  }
+
   #if EXTRUDERS > 1
     block->extruder = extruder;
   #endif

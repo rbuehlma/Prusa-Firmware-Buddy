@@ -788,6 +788,8 @@ private:
   #if ENABLED(EXPERIMENTAL_I2CBUS)
     static void M260();
     static void M261();
+    static void M262();
+    static void M263();
   #endif
 
   #if HAS_SERVOS
