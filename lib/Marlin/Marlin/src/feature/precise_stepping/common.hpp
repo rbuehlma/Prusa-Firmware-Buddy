@@ -134,7 +134,7 @@ static_assert(StepEventFlag::STEP_EVENT_FLAG_X_ACTIVE == (1u << STEP_EVENT_FLAG_
 struct step_event_i32_t {
     int32_t time_ticks;
     StepEventFlag_t flags;
-    const move_t *move = nullptr;
+    uint8_t pre_block_commands_idx = 0;
 };
 
 // Used by step event queue. So, the maximum time difference between step events is 2^16 / STEPPER_TIMER_RATE,
@@ -209,7 +209,7 @@ typedef struct step_event_info_t {
     double time;
     StepEventFlag_t flags;
     StepEventInfoStatus status;
-    const move_t *move;
+    uint8_t pre_block_commands_idx = 0;
 } step_event_info_t;
 
 enum StepGeneratorStatus : uint8_t {

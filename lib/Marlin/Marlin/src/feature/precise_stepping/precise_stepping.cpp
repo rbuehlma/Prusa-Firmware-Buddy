@@ -368,7 +368,7 @@ void classic_step_generator_reset_position(classic_step_generator_t &step_genera
 
 step_event_info_t classic_step_generator_next_step_event(classic_step_generator_t &step_generator, step_generator_state_t &step_generator_state) {
     assert(step_generator.current_move != nullptr);
-    step_event_info_t next_step_event = { std::numeric_limits<double>::max(), 0, STEP_EVENT_INFO_STATUS_GENERATED_INVALID, nullptr };
+    step_event_info_t next_step_event = { std::numeric_limits<double>::max(), 0, STEP_EVENT_INFO_STATUS_GENERATED_INVALID, 0 };
 
     const float half_step_dist = Planner::mm_per_half_step[step_generator.axis];
     const float next_target = float(step_generator_state.current_distance[step_generator.axis] + (step_generator.step_dir ? 0 : -1)) * Planner::mm_per_step[step_generator.axis] + half_step_dist;
@@ -425,7 +425,7 @@ step_event_info_t classic_step_generator_next_step_event(classic_step_generator_
         step_generator_state.current_distance[step_generator.axis] += (step_generator.step_dir ? 1 : -1);
     }
 
-    next_step_event.move = step_generator.current_move;
+    next_step_event.pre_block_commands_idx = step_generator.current_move->pre_block_commands_idx;
     // When std::numeric_limits<double>::max() is returned, it means that for the current state of the move segment queue, there isn't any next step event for this axis.
     return next_step_event;
 }
@@ -455,7 +455,7 @@ bool generate_next_step_event(step_event_i32_t &step_event, step_generator_state
     // Sorting buffer isn't fulfilled for all active axis, so we need to fulfill.
     // So we don't have anything to put into step_event_buffer.
     step_event_info_t *event = &step_state.step_events[old_nearest_step_event_idx];
-    step_event.move = event->move;
+    step_event.pre_block_commands_idx = event->pre_block_commands_idx;
     auto step_status = step_state.step_events[old_nearest_step_event_idx].status;
     if (step_status == STEP_EVENT_INFO_STATUS_GENERATED_VALID || step_status == STEP_EVENT_INFO_STATUS_GENERATED_KEEP_ALIVE) {
         const double step_time_absolute = step_state.step_events[old_nearest_step_event_idx].time;
@@ -1205,9 +1205,7 @@ StepGeneratorStatus PreciseStepping::process_one_move_segment_from_queue() {
 
             step_event_i32_t new_step_event;
             bool done = generate_next_step_event(new_step_event, step_generator_state);
-            if (new_step_event.move != nullptr) {
-                next_step_event->pre_block_commands_idx = new_step_event.move->pre_block_commands_idx;
-            }
+            next_step_event->pre_block_commands_idx = new_step_event.pre_block_commands_idx;
 
             // accumulate into or flush the buffered step
             if (new_step_event.flags) {
